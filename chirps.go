@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"internal/auth"
 	"internal/database"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 )
 
 func CreateChirp(w http.ResponseWriter, r *http.Request) {
+
 	type parameters struct {
 		Body    string    `json:"body"`
 		User_id uuid.UUID `json:"user_id"`
@@ -32,6 +34,24 @@ func CreateChirp(w http.ResponseWriter, r *http.Request) {
 
 	respBody := respParams{}
 	statusCode := 201
+
+	//authentication
+	token, err2 := auth.GetBearerToken(r.Header)
+	tokenuser, err3 := auth.ValidateJWT(token, Config.secret)
+	if err2 != nil || err3 != nil {
+		respBody.Error = "Error validating token"
+		respBody.Valid = false
+		statusCode = 401
+		respJson, err := json.Marshal(respBody)
+		if err != nil {
+			fmt.Printf("Error marshalling json %s", err)
+			return
+		}
+		w.WriteHeader(statusCode)
+		w.Write(respJson)
+		return
+	}
+
 	// request errors
 	if err != nil {
 		respBody.Error = fmt.Sprintf("%s", err)
@@ -49,7 +69,7 @@ func CreateChirp(w http.ResponseWriter, r *http.Request) {
 		// request ok
 		dbparams := database.CreateChirpParams{
 			Body:   cleanChirp(params.Body),
-			UserID: params.User_id,
+			UserID: tokenuser,
 		}
 		Chirp, err := Config.dbQueries.CreateChirp(r.Context(), dbparams)
 		if err != nil {

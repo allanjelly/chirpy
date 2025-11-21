@@ -16,6 +16,7 @@ import (
 type apiconfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
+	secret         string
 }
 
 var Config apiconfig
@@ -29,6 +30,8 @@ func main() {
 		fmt.Print("Error connecting to db")
 		os.Exit(1)
 	}
+
+	Config.secret = os.Getenv("SECRET")
 	Config.dbQueries = database.New(db)
 
 	ServeMux := http.NewServeMux()
@@ -41,9 +44,9 @@ func main() {
 	ServeMux.HandleFunc("POST /admin/reset", MetricsResetHandler)
 
 	//api
-
-	ServeMux.HandleFunc("POST /api/chirps", CreateChirp)
 	ServeMux.HandleFunc("POST /api/users", CreateUser)
+	ServeMux.HandleFunc("POST /api/login", UserLogin)
+	ServeMux.HandleFunc("POST /api/chirps", CreateChirp)
 	ServeMux.HandleFunc("GET /api/chirps", GetChirps)
 	ServeMux.HandleFunc("GET /api/chirps/{id}", GetChirp)
 
