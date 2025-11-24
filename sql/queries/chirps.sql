@@ -6,5 +6,11 @@ RETURNING *;
 -- name: GetChirps :many
 SELECT * FROM chirps ORDER BY created_at;
 
+-- name: GetChirpsForAuthor :many
+SELECT * FROM chirps where user_id = $1 order by created_at;
+
 -- name: GetChirp :one
 SELECT * FROM chirps where id = $1;
+
+-- name: DeleteChirp :exec
+DELETE FROM chirps where id=$1;

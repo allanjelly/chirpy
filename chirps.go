@@ -6,6 +6,7 @@ import (
 	"internal/auth"
 	"internal/database"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -124,12 +125,26 @@ func GetChirps(w http.ResponseWriter, r *http.Request) {
 	respBody := []respItem{}
 	statusCode := 200
 
-	Chirps, err := Config.dbQueries.GetChirps(r.Context())
+	author := r.URL.Query().Get("author_id")
+	authoruid, _ := uuid.Parse(author)
+
+	var Chirps []database.Chirp
+	var err error
+	if authoruid != uuid.Nil {
+		Chirps, err = Config.dbQueries.GetChirpsForAuthor(r.Context(), authoruid)
+	} else {
+		Chirps, err = Config.dbQueries.GetChirps(r.Context())
+	}
 
 	if err != nil {
 		respBody = append(respBody, respItem{Error: fmt.Sprintf("Error getting chirps from db:%s", err)})
 		statusCode = 400
 	} else {
+
+		sortord := r.URL.Query().Get("sort")
+		if sortord == "desc" {
+			sort.Slice(Chirps, func(i, j int) bool { return Chirps[i].CreatedAt.String() > Chirps[j].CreatedAt.String() })
+		}
 		for _, Chirp := range Chirps {
 			respBody = append(respBody, respItem{Id: Chirp.ID,
 				Created_at: Chirp.CreatedAt,
@@ -195,4 +210,44 @@ func GetChirp(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(statusCode)
 	w.Write(respJson)
+}
+
+func DeleteChirp(w http.ResponseWriter, r *http.Request) {
+
+	//authentication
+	token, err := auth.GetBearerToken(r.Header)
+	tokenuser, err2 := auth.ValidateJWT(token, Config.secret)
+	if err != nil || err2 != nil {
+		w.WriteHeader(401)
+		return
+	}
+
+	chirpId := r.PathValue("chirpID")
+	if chirpId == "" {
+		w.WriteHeader(404)
+		return
+	}
+	chirp, err := uuid.Parse(chirpId)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	dbChirp, err := Config.dbQueries.GetChirp(r.Context(), chirp)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	if dbChirp.UserID != tokenuser {
+		w.WriteHeader(403)
+		return
+	}
+
+	err = Config.dbQueries.DeleteChirp(r.Context(), chirp)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+	w.WriteHeader(204)
 }

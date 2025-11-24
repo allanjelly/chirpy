@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -53,4 +55,22 @@ func GetBearerToken(headers http.Header) (string, error) {
 		return "", errors.New("error getting jwt token")
 	}
 	return tokenstring, nil
+}
+
+func MakeRefreshToken() (string, error) {
+	token := make([]byte, 32)
+	rand.Read(token)
+
+	return hex.EncodeToString(token), nil
+
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+
+	apiKey := headers.Get("Authorization")
+	apiKey, ok := strings.CutPrefix(apiKey, "ApiKey ")
+	if !ok || len(apiKey) == 0 {
+		return "", errors.New("error getting apikey")
+	}
+	return apiKey, nil
 }

@@ -7,12 +7,14 @@ package database
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, email, password)
 VALUES (gen_random_uuid(),NOW(),NOW(),$1,$2)
-RETURNING id, created_at, updated_at, email, password
+RETURNING id, created_at, updated_at, email, password, is_chirpy_red
 `
 
 type CreateUserParams struct {
@@ -29,6 +31,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.Email,
 		&i.Password,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -43,7 +46,7 @@ func (q *Queries) DeleteUsers(ctx context.Context) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, created_at, updated_at, email, password FROM users WHERE email = $1
+SELECT id, created_at, updated_at, email, password, is_chirpy_red FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, email string) (User, error) {
@@ -55,6 +58,50 @@ func (q *Queries) GetUser(ctx context.Context, email string) (User, error) {
 		&i.UpdatedAt,
 		&i.Email,
 		&i.Password,
+		&i.IsChirpyRed,
+	)
+	return i, err
+}
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users SET email=$2, password=$3, updated_at=NOW() where id=$1
+RETURNING id, created_at, updated_at, email, password, is_chirpy_red
+`
+
+type UpdateUserParams struct {
+	ID       uuid.UUID
+	Email    string
+	Password string
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUser, arg.ID, arg.Email, arg.Password)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.Password,
+		&i.IsChirpyRed,
+	)
+	return i, err
+}
+
+const upgradeUser_is_red = `-- name: UpgradeUser_is_red :one
+UPDATE users SET is_chirpy_red = true where id=$1 RETURNING id, created_at, updated_at, email, password, is_chirpy_red
+`
+
+func (q *Queries) UpgradeUser_is_red(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, upgradeUser_is_red, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.Password,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
